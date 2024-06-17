@@ -10,19 +10,19 @@ on:
       DEVICE_TREE_URL:
         description: Device Tree URL
         required: true
-        default: https://github.com/PitchBlackRecoveryProject/android_device_infinix_X6739-pbrp
+        default: https://github.com/NoNameBuilder/greatjtwrp
       DEVICE_TREE_BRANCH:
         description: Device Tree Branch
         required: true
-        default: android-12.1
+        default: main
       DEVICE_PATH:
         description: Path the device tree should be synced to, relative to source root
         required: true
-        default: device/infinix/X6739
+        default: device/samsung/a24
       DEVICE_MAKEFILE:
         description: 'Name of device-specific makefile from tree (format: <PREFIX>_<DEVICE_NAME>)'
         required: true
-        default: pb_X6739
+        default: a24
       BUILD_TARGET:
         type: choice
         description: Partition containing recovery ramdisk
