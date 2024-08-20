@@ -14,11 +14,11 @@ on:
         - 7.1
         - 6.0
         required: true
-        default: 12.1
+        default: 11.1
       DEVICE_TREE_URL:
         description: Device Tree URL
         required: true
-        default: https://github.com/TeamWin/android_device_asus_I003D
+        default: https://github.com/BladeTN/OrangeFox_A12s
       DEVICE_TREE_BRANCH:
         description: Device Tree Branch
         required: true
@@ -26,11 +26,11 @@ on:
       DEVICE_PATH:
         description: Path the device tree should be synced to, relative to source root
         required: true
-        default: device/asus/I003D
+        default: device/samsung/a12sub/a12s
       DEVICE_NAME:
         description: Device Name from tree (should match name on twrp_<DEVICE_NAME>.mk)
         required: true
-        default: I003D
+        default: a12s
       REPOPICK_PATCHES:
         description: (Optional) Gerrit commit numbers separated by a space to be included in the build (leave blank if not using)
         type: string
@@ -116,8 +116,8 @@ jobs:
       run: |
         mkdir workspace
         cd workspace
-        git config --global user.name "${GITHUB_ACTOR}"
-        git config --global user.email "${GITHUB_ACTOR_ID}+${GITHUB_ACTOR}@users.noreply.github.com"
+        git config --global user.name "${BladeTN}"
+        git config --global user.email "${bladeTrinity466}@users.noreply.github.com"
         repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_${{ steps.buildtree.outputs.value }}.git -b twrp-${{ inputs.MANIFEST_BRANCH }}
           
     - name: Repo Sync
