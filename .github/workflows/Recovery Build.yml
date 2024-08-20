@@ -3,143 +3,118 @@ name: Recovery Build
 on:
   workflow_dispatch:
     inputs:
-      MANIFEST_BRANCH:
-        type: choice
-        description: Manifest Branch
-        options:
-        - 12.1
-        - 11
-        required: true
-        default: 12.1
-      DEVICE_TREE_URL:
-        description: Device Tree URL
-        required: true
-        default: https://gitlab.com/OrangeFox/device/lavender
-      DEVICE_TREE_BRANCH:
-        description: Device Tree Branch
-        required: true
-        default: fox_12.1
-      DEVICE_PATH:
-        description: Path the device tree should be synced to, relative to source root
-        required: true
-        default: device/xiaomi/lavender
-      DEVICE_NAME:
-        description: Device Name from tree (should match name on twrp_<DEVICE_NAME>.mk)
-        required: true
-        default: lavender
-      BUILD_TARGET:
-        type: choice
-        description: Partition containing recovery ramdisk
-        options:
-        - boot
-        - recovery
-        - vendor_boot
-        required: true
-        default: recovery
-      OPTIONAL_FLAGS:
-        description: (Optional) Additional "FOX_" flags for build can be added here
-        required: false
+      #
+# Copyright (C) 2022 The OrangeFox Recovery Project
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
 
-jobs:
-  build:
-    if: github.event.repository.owner.id == github.event.sender.id
-    runs-on: ubuntu-20.04
-    # You can use either of the ubuntu-20.04 or ubuntu-22.04 runner
-    steps:
-    - name: Display Run Parameters
-      run: |
-        echo "::group::User Environment Variables"
-        echo "Manifest Branch: ${{ inputs.MANIFEST_BRANCH }}"
-        echo "Device Tree URL: ${{ inputs.DEVICE_TREE_URL }}"
-        echo "Device Tree Branch: ${{ inputs.DEVICE_TREE_BRANCH }}"
-        echo "Device Path: ${{ inputs.DEVICE_PATH }}"
-        echo "Device Name: ${{ inputs.DEVICE_NAME }}"
-        echo "Build Target: ${{ inputs.BUILD_TARGET }}.img"
-        echo "::endgroup::"
- 
-    # You might want to Checkout your repo first, but not mandatory
-    - name: Check Out
-      uses: actions/checkout@v4
-    # Cleanup The Actions Workspace Using Custom Composite Run Actions
-    - name: Cleanup
-      uses: rokibhasansagar/slimhub_actions@main
-      # That's it! Now use your normal steps
+DEVICE_PATH := device/samsung/a12s
 
-    - name: Set Swap Space
-      uses: pierotofy/set-swap-space@master
-      with:
-        swap-size-gb: 24
+# Architecture
+TARGET_ARCH := arm64
+TARGET_ARCH_VARIANT := armv8-a
+TARGET_CPU_ABI := arm64-v8a
+TARGET_CPU_ABI2 := 
+TARGET_CPU_VARIANT := generic
+TARGET_CPU_VARIANT_RUNTIME := generic
 
-    - name: Prepare the build environment
-      run: |
-        sudo apt install git aria2 -y
-        git clone https://gitlab.com/OrangeFox/misc/scripts
-        cd scripts
-        sudo bash setup/android_build_env.sh
+TARGET_2ND_ARCH := arm
+TARGET_2ND_ARCH_VARIANT := armv7-a-neon
+TARGET_2ND_CPU_ABI := armeabi-v7a
+TARGET_2ND_CPU_ABI2 := armeabi
+TARGET_2ND_CPU_VARIANT := generic
+TARGET_2ND_CPU_VARIANT_RUNTIME := cortex-a15
 
-    - name: Sync OrangeFox sources and minimal manifest
-      run: |
-        mkdir OrangeFox_sync
-        cd OrangeFox_sync
-        git clone https://gitlab.com/OrangeFox/sync.git
-        cd sync
-        ./orangefox_sync.sh --branch ${{ inputs.MANIFEST_BRANCH }} --path ${{ github.workspace }}/fox_${{ inputs.MANIFEST_BRANCH }}
-        sed -i "s/TeamWin/OrangeFox/g" ${{ github.workspace }}/fox_${{ inputs.MANIFEST_BRANCH }}/vendor/twrp/build/tools/roomservice.py
+# APEX
+DEXPREOPT_GENERATE_APEX_IMAGE := true
 
-    - name: Place device trees and kernel
-      run: |
-        mkdir -p .repo/local_manifests
-        cp -f ${GITHUB_WORKSPACE}/templates/roomservice.xml .repo/local_manifests/
-        REMOTE_NAME=$(grep -oP '(?<=://).*(?=\.)' <<< ${{ inputs.DEVICE_TREE_URL }})
-        REMOTE_FETCH=$(grep -oP '(?<=://).*?(?=\/)' <<< ${{ inputs.DEVICE_TREE_URL }})
-        if [ "${REMOTE_NAME}" != "github" ]; then
-          sed -i "s%\!--remote name=\"{REMOTE_NAME}%remote name=\"${REMOTE_NAME}%g" .repo/local_manifests/roomservice.xml
-          sed -i "s%{REMOTE_FETCH}\"/-->%${REMOTE_FETCH}\"/>%g" .repo/local_manifests/roomservice.xml
-        fi
-        sed -i "s%\!--project name=\"{DEVICE_TREE_URL_REPO}%project name=\"$(grep -oP "(?<=${REMOTE_FETCH}/).*" <<< ${{ inputs.DEVICE_TREE_URL }})%g" .repo/local_manifests/roomservice.xml
-        sed -i "s%{DEVICE_PATH}%${{ inputs.DEVICE_PATH }}%g" .repo/local_manifests/roomservice.xml
-        sed -i "s%{DEVICE_REMOTE_NAME}%${REMOTE_NAME}%g" .repo/local_manifests/roomservice.xml
-        sed -i "s%{DEVICE_TREE_BRANCH}\"/-->%${{ inputs.DEVICE_TREE_BRANCH }}\"/>%g" .repo/local_manifests/roomservice.xml
-        repo sync ${{ inputs.DEVICE_PATH }} -j$(nproc --all)
-        DT_NAME=$(awk -F/ '{print $NF}' <<< ${{ inputs.DEVICE_TREE_URL }})
-        if [ "$DT_NAME" != ${{ inputs.DEVICE_NAME }} ]; then
-          if [ -z "$(ls ${{ inputs.DEVICE_PATH }}/${{ inputs.DEVICE_NAME }}/BoardConfig.mk 2>/dev/null)" ]; then
-            mkdir ${{ inputs.DEVICE_PATH }}/${{ inputs.DEVICE_NAME }}
-            DT_BoardConfig=$(ls ${{ inputs.DEVICE_PATH }}/BoardConfig* | head -1)
-            echo -e "-include ${DT_BoardConfig}">${{ inputs.DEVICE_PATH }}/${{ inputs.DEVICE_NAME }}/BoardConfig.mk
-          fi
-        fi
-      working-directory: fox_${{ inputs.MANIFEST_BRANCH }}
+# Bootloader
+TARGET_BOOTLOADER_BOARD_NAME := exynos850
+TARGET_NO_BOOTLOADER := true
 
-    - name: Build it
-      run: |
-        set +e
-        source build/envsetup.sh
-        set -e
-        export ALLOW_MISSING_DEPENDENCIES=true
-        export FOX_BUILD_DEVICE=${{ inputs.DEVICE_NAME }}
-        export LC_ALL="C"
-        if [ -n "${{ inputs.OPTIONAL_FLAGS}}" ]; then
-          ${{ inputs.OPTIONAL_FLAGS }}
-          echo -e "Additional Command(s): ${{ inputs.OPTIONAL_FLAGS }}"
-        else
-          echo "No additional commands specified."
-        fi
-        lunch twrp_${{ inputs.DEVICE_NAME }}-eng && mka $(tr -d _ <<< ${{ inputs.BUILD_TARGET }})image
-      working-directory: fox_${{ inputs.MANIFEST_BRANCH }}
+# Display
+TARGET_SCREEN_DENSITY := 300
 
-    - name: Upload to Release
-      uses: softprops/action-gh-release@4634c16e79c963813287e889244c50009e7f0981
-      with:
-        files: |
-          fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/*${{ inputs.DEVICE_NAME }}*
-          fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/obj/PACKAGING/vendor_ramdisk_fragments_intermediates/recovery.*
-          fox_${{ inputs.MANIFEST_BRANCH }}/out/target/product/${{ inputs.DEVICE_NAME }}/ramdisk-recovery.*
-        name: |
-          ${{ inputs.DEVICE_NAME }} (OrangeFox)
-        tag_name: ${{ github.run_id }}
-        body: |
-          Manifest: ${{ inputs.MANIFEST_BRANCH }}
-          Target: ${{ inputs.BUILD_TARGET }}
+
+
+# Kernel
+BOARD_BOOTIMG_HEADER_VERSION := 2
+BOARD_KERNEL_BASE := 0x10000000
+BOARD_KERNEL_CMDLINE := androidboot.hardware=exynos850 androidboot.selinux=enforce loop.max_part=7
+BOARD_KERNEL_PAGESIZE := 2048
+BOARD_RAMDISK_OFFSET := 0x01000000
+BOARD_KERNEL_TAGS_OFFSET := 0x00000100
+BOARD_MKBOOTIMG_ARGS += --header_version $(BOARD_BOOTIMG_HEADER_VERSION)
+BOARD_MKBOOTIMG_ARGS += --ramdisk_offset $(BOARD_RAMDISK_OFFSET)
+BOARD_MKBOOTIMG_ARGS += --tags_offset $(BOARD_KERNEL_TAGS_OFFSET)
+BOARD_KERNEL_IMAGE_NAME := Image
+BOARD_INCLUDE_DTB_IN_BOOTIMG := true
+BOARD_KERNEL_SEPARATED_DTBO := true
+TARGET_KERNEL_CONFIG := a12s_defconfig
+TARGET_KERNEL_SOURCE := kernel/samsung/a12s
+
+
+ Kernel - prebuilt
+TARGET_FORCE_PREBUILT_KERNEL := true
+ifeq ($(TARGET_FORCE_PREBUILT_KERNEL),true)
+TARGET_PREBUILT_KERNEL := $(DEVICE_PATH)/prebuilt/kernel
+TARGET_PREBUILT_DTB := $(DEVICE_PATH)/prebuilt/dtb.img
+BOARD_MKBOOTIMG_ARGS += --dtb $(TARGET_PREBUILT_DTB)
+BOARD_INCLUDE_DTB_IN_BOOTIMG := 
+BOARD_PREBUILT_DTBOIMAGE := $(DEVICE_PATH)/prebuilt/dtbo.img
+BOARD_KERNEL_SEPARATED_DTBO := 
+endif
+
+## Bootloader
+TARGET_BOOTLOADER_BOARD_NAME := exynos850
+TARGET_NO_BOOTLOADER := true
+
+# Platform
+TARGET_BOARD_PLATFORM := universal3830
+
+# Recovery
+BOARD_INCLUDE_RECOVERY_DTBO := true
+TARGET_USERIMAGES_USE_EXT4 := true
+TARGET_USERIMAGES_USE_F2FS := true
+
+# Crypto
+TW_INCLUDE_CRYPTO := true
+TW_INCLUDE_CRYPTO_FBE := true
+
+# Recovery
+LZMA_COMPRESSION := -9
+LZMA_RAMDISK_TARGETS := recovery
+RECOVERY_SDCARD_ON_DATA := true
+TARGET_RECOVERY_PIXEL_FORMAT := "ABGR_8888"
+TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery.fstab
+
+# TWRP specific build flags
+TW_THEME := portrait_hdpi
+TARGET_USE_CUSTOM_LUN_FILE_PATH := "/sys/devices/15400000.usb/15400000.dwc3/gadget/lun%d/file"
+TW_BRIGHTNESS_PATH := "/sys/devices/13900000.dsim/backlight/panel/brightness"
+TW_MAX_BRIGHTNESS := 255
+TW_DEFAULT_BRIGHTNESS := 162
+TW_CUSTOM_CPU_TEMP_PATH := "/sys/class/thermal/thermal_zone1/temp"
+TW_NO_REBOOT_BOOTLOADER := true
+TW_HAS_DOWNLOAD_MODE := true
+TW_INCLUDE_NTFS_3G := true
+TW_USE_NEW_MINADBD := true
+BOARD_HAS_NO_REAL_SDCARD := true
+TW_EXCLUDE_TWRPAPP := true
+TW_FORCE_USE_BUSYBOX := true
+TW_INCLUDE_RESETPROP := true
+TW_EXTRA_LANGUAGES := true
+
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
