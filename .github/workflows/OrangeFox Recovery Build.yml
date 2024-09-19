@@ -5,7 +5,7 @@ on:
     inputs:
       MANIFEST_BRANCH:
         type: choice
-        description: Manifest Branch
+        description: OrangeFox Manifest Branch
         options:
         - 12.1
         - 11
@@ -14,19 +14,19 @@ on:
       DEVICE_TREE_URL:
         description: Device Tree URL
         required: true
-        default: https://gitlab.com/OrangeFox/device/lavender
+        default: https://github.com/xMySuA/twrp_device_xiaomi_peridot
       DEVICE_TREE_BRANCH:
         description: Device Tree Branch
         required: true
-        default: fox_12.1
+        default: peridot_global-user-14-UKQ1.240116.001-V816.0.7.0.UNPMIXM-release-keys
       DEVICE_PATH:
         description: Path the device tree should be synced to, relative to source root
         required: true
-        default: device/xiaomi/lavender
+        default: device/xiaomi/peridot
       DEVICE_NAME:
         description: Device Name from tree (should match name on twrp_<DEVICE_NAME>.mk)
         required: true
-        default: lavender
+        default: peridot
       BUILD_TARGET:
         type: choice
         description: Partition containing recovery ramdisk
